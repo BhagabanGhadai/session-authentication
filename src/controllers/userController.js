@@ -64,7 +64,7 @@ const signUp = async function (req, res) {
 /**********************************************************LogIn********************************************************/
 
 const login = async function (req, res) {
-    // try {
+    try {
         if (req.session.userId) {
             return res.status(200).send({ status: false, message: "you are alreday loggedIn" })
         }
@@ -88,24 +88,27 @@ const login = async function (req, res) {
             return res.status(400).send({ status: false, message: "emailId is invalid,enter Correct email Address" });
         }
         const limitDevide=await limitModel.find(loginDetails)
-        if(limitDevide.length===5){
-            return res.status(400).send({ status: false, message: "exceeded!!you can login for 5 device" });
+
+        if(limitDevide.length===1){
+            return res.status(400).send({ status: false, message: "exceeded!!you can login for single device" });
         }
         const findUserFromDB = await userModel.findOne({email})
 
         if (!findUserFromDB) {
             return res.status(404).send({ status: false, message: "No User Found" });
         }
-        
-        if(findUserFromDB.loginAttempts===3) {
+        if(findUserFromDB.loginAttempts==3&&new Date-findUserFromDB.lockedAt>3600000){
             await userModel.findOneAndUpdate({_id:findUserFromDB._id},
-                {$set:{lockUntil:Date.now+1000 * 60 * 60 * 24 ,islocked:true}},
+                {$set:{lockedAt:Date.now(),loginAttempts:0}},
                 {new:true})
-            }
-
-            if(findUserFromDB.isLocked==true){
-                return res.status(400).send({ msg: 'You have exceeded the maximum number of login attempts' })
         }
+        if(findUserFromDB.loginAttempts==3) {
+            await userModel.findOneAndUpdate({_id:findUserFromDB._id},
+                {$set:{lockedAt:Date.now()}},
+                {new:true})
+                return res.status(400).send({ msg: 'You have exceeded the maximum number of login attempts!!try after 1 hour' })
+            }
+ 
 
         if(findUserFromDB.password!==password){
           await userModel.findOneAndUpdate({_id:findUserFromDB._id},
@@ -113,24 +116,28 @@ const login = async function (req, res) {
             {new:true})
                 return res.status(400).send({ status: false, message: "You have Entered Wrong Password" });
         }
-         await limitModel.create(loginDetails)
         req.session.userId = findUserFromDB._id.toString()
+
+        loginDetails.userId=req.session.userId
+
+         await limitModel.create(loginDetails)
 
         return res.status(200).send({ status: true, message: "login sucessfull" })
 
-    // }
-    // catch (error) {
-    //     return res.status(500).send({ status: false, message: "Error", error: error.message })
-    // }
+    }
+    catch (error) {
+        return res.status(500).send({ status: false, message: "Error", error: error.message })
+    }
 }
 
-/********************************************************Log Out******************************************************/
+/********************************************************LogOut***************************************************/
 
 const logout = async function (req, res) {
     try {
         if (!req.session.userId) {
             return res.status(200).send({ status: false, message: 'you are already logged out' })
         }
+        await limitModel.findOneAndDelete({userId:req.session.userId})
         delete req.session.userId
         return res.status(302).send({ status: true, message: "logout successful" })
     }

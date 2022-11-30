@@ -25,15 +25,9 @@ const userSchema = new mongoose.Schema(
             required: true,
             default: 0
         },
-        lockUntil:{
-          type: Number ,
-          default:0
-        },
-        isLocked:{
-            type:Boolean,
-            default:false
+        lockedAt:{
+          type: Date 
         }
-
     }, { timestamps: true }
 
 );
